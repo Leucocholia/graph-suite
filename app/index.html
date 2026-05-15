@@ -1,0 +1,1286 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Generic Graph Renderer</title>
+<script>
+  window.MathJax = {
+    tex: {
+      inlineMath: [["\\(", "\\)"]],
+      displayMath: [["\\[", "\\]"]]
+    }
+  };
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+<style>
+  :root {
+    color-scheme: light;
+    --ink: #15212b;
+    --muted: #64727f;
+    --line: #d8e0e7;
+    --paper: #f7f9fb;
+    --accent: #26547c;
+    --gold: #f8d66d;
+    --coral: #ef476f;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: var(--ink);
+    background: var(--paper);
+  }
+
+  main {
+    width: min(1720px, calc(100vw - 32px));
+    min-height: calc(100vh - 48px);
+    margin: 24px auto;
+    display: grid;
+    grid-template-columns: 360px minmax(0, 1fr) 420px;
+    gap: 18px;
+  }
+
+  aside, section.player, section.prose-panel {
+    background: white;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    box-shadow: 0 18px 40px rgba(21, 33, 43, 0.08);
+  }
+
+  aside { padding: 18px; display: grid; align-content: start; gap: 16px; }
+  h1, p { margin: 0; }
+  h1 { font-size: 1.35rem; line-height: 1.15; }
+
+  .hint, .stat span { color: var(--muted); font-size: 0.92rem; line-height: 1.45; }
+  .stats { display: grid; gap: 10px; padding-top: 2px; }
+  .stat { display: grid; gap: 2px; }
+  .stat strong { font-size: 1.05rem; }
+  .controls, .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+
+  button {
+    border: 1px solid #b8c7d2;
+    border-radius: 6px;
+    background: white;
+    color: var(--ink);
+    padding: 9px 12px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  button.primary { background: var(--accent); border-color: var(--accent); color: white; }
+  button:disabled { opacity: 0.45; cursor: default; }
+
+  label { display: grid; gap: 4px; color: var(--muted); font-size: 0.8rem; font-weight: 700; }
+
+  input[type="text"], input[type="number"], select, textarea {
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 8px 9px;
+    font: inherit;
+    color: var(--ink);
+    background: white;
+  }
+
+  input[type="range"] { width: 160px; }
+  .toolbar input[type="number"] { width: 110px; }
+  .preset-note { color: var(--muted); font-size: 0.78rem; line-height: 1.35; margin-top: -10px; }
+
+  .prose-panel {
+    display: grid;
+    align-content: start;
+    gap: 12px;
+    padding: 18px;
+    min-height: calc(100vh - 48px);
+    max-height: calc(100vh - 48px);
+    overflow: auto;
+  }
+
+  .prose-panel h2 {
+    margin: 0;
+    font-size: 0.82rem;
+    letter-spacing: 0;
+    color: var(--muted);
+  }
+
+  .prose-panel p {
+    color: var(--ink);
+    font-size: 1rem;
+    line-height: 1.62;
+  }
+
+  .prose-panel p.note-heading {
+    margin-top: 8px;
+    font-weight: 800;
+    color: var(--ink);
+  }
+
+  .prose-panel code {
+    border: 1px solid #d8e0e7;
+    border-radius: 4px;
+    padding: 1px 4px;
+    background: #f3f6f8;
+    color: #263238;
+    font: 0.92em/1.35 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  }
+
+  .prose-panel pre {
+    margin: 0;
+    overflow-x: hidden;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 10px;
+    background: #f8fafc;
+  }
+
+  .prose-panel pre code {
+    border: 0;
+    padding: 0;
+    background: transparent;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: normal;
+    font-size: 0.86rem;
+  }
+
+  .prose-panel mjx-container {
+    overflow-x: auto;
+    overflow-y: hidden;
+    max-width: 100%;
+  }
+
+  textarea {
+    min-height: 260px;
+    resize: vertical;
+    font: 12px/1.42 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+    tab-size: 2;
+  }
+
+  .compiler-output {
+    min-height: 84px;
+    max-height: 180px;
+    overflow: auto;
+    margin: 0;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 9px;
+    background: #fbfdff;
+    color: var(--muted);
+    white-space: pre-wrap;
+    font: 12px/1.42 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  }
+
+  .compiler-output.bad {
+    border-color: #f0a5b8;
+    color: #8d2740;
+    background: #fff8fa;
+  }
+
+  .player {
+    min-height: calc(100vh - 48px);
+    display: grid;
+    grid-template-rows: auto minmax(360px, 1fr);
+    overflow: hidden;
+  }
+
+  .toolbar { justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+  .status { display: flex; align-items: baseline; gap: 10px; }
+  .status strong { font-size: 1rem; }
+  .status span { color: var(--muted); font-size: 0.9rem; }
+
+  #stage {
+    position: relative;
+    min-height: 360px;
+    background:
+      linear-gradient(rgba(216, 224, 231, 0.45) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(216, 224, 231, 0.45) 1px, transparent 1px),
+      #fbfdff;
+    background-size: 28px 28px;
+  }
+
+  canvas { width: 100%; height: 100%; min-height: 360px; display: block; }
+
+  .overlay {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    color: var(--muted);
+    font-weight: 700;
+    text-align: center;
+    pointer-events: none;
+  }
+
+  .hidden { display: none; }
+
+  @media (max-width: 1280px) {
+    main { grid-template-columns: 340px minmax(0, 1fr); }
+    .prose-panel { grid-column: 1 / -1; min-height: auto; max-height: none; }
+  }
+
+  @media (max-width: 840px) {
+    main { grid-template-columns: 1fr; }
+    .player { min-height: 62vh; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <aside>
+    <div>
+      <h1>Generic Graph Renderer</h1>
+      <p class="hint">Compile Haskell graph programs and preview the generated animation frames.</p>
+    </div>
+
+    <div class="controls">
+      <button id="toggleVertices" type="button">Hide vertices</button>
+      <button id="toggleCliques" type="button">Color cliques</button>
+      <button id="toggleCliqueEdges" type="button">Color clique edges</button>
+      <button id="toggleCliqueAreas" type="button">Shade cliques</button>
+      <button id="toggleLayout" type="button">Line arcs</button>
+    </div>
+
+    <label>
+      Program preset
+      <select id="presetSelect"></select>
+    </label>
+    <p id="presetNote" class="preset-note"></p>
+
+    <label>
+      Vertices
+      <input id="vertexInput" type="number" min="0" value="6" />
+    </label>
+
+    <label>
+      Haskell source
+      <textarea id="haskellInput" spellcheck="false" aria-label="Haskell source"></textarea>
+    </label>
+
+    <div class="controls">
+      <button id="compileButton" class="primary" type="button">Compile &amp; run</button>
+      <button id="loadMainButton" type="button">Load Main.hs</button>
+    </div>
+    <pre id="compileOutput" class="compiler-output" aria-live="polite">Ready to compile.</pre>
+
+    <div class="stats" aria-live="polite">
+      <div class="stat"><span>Frames</span><strong id="frameTotal">0</strong></div>
+      <div class="stat"><span>Vertices</span><strong id="vertexTotal">0</strong></div>
+      <div class="stat"><span>Data size</span><strong id="dataSize">Not loaded</strong></div>
+      <div class="stat"><span>Load status</span><strong id="loadStatus">Ready</strong></div>
+    </div>
+
+    <label>
+      Jump to frame
+      <input id="jumpInput" type="number" min="1" value="1" />
+    </label>
+    <button id="jumpButton" type="button">Jump</button>
+  </aside>
+
+  <section class="player" aria-label="Graph animation player">
+    <div class="toolbar">
+      <div class="controls">
+        <button id="prev" type="button" aria-label="Previous frame">&#8592;</button>
+        <button id="play" class="primary" type="button">Play</button>
+        <button id="next" type="button" aria-label="Next frame">&#8594;</button>
+      </div>
+      <div class="status">
+        <strong id="title">No frames loaded</strong>
+        <span id="count">0 / 0</span>
+      </div>
+      <div class="controls">
+        <label>
+          Step
+          <input id="stepSize" type="number" min="1" value="1" />
+        </label>
+        <label>
+          Speed <span id="speedText">12 FPS</span>
+          <input id="speed" type="range" min="1" max="60" step="1" value="12" />
+        </label>
+      </div>
+    </div>
+    <div id="stage">
+      <canvas id="canvas"></canvas>
+      <div id="overlay" class="overlay">Compile or run a preset to begin.</div>
+    </div>
+  </section>
+
+  <aside class="prose-panel" aria-labelledby="proseTitle">
+    <h2 id="proseTitle">Mathematical note</h2>
+    <div id="proseBody"></div>
+  </aside>
+</main>
+
+<script>
+const canvas = document.querySelector("#canvas");
+const ctx = canvas.getContext("2d");
+const stage = document.querySelector("#stage");
+const overlay = document.querySelector("#overlay");
+const title = document.querySelector("#title");
+const count = document.querySelector("#count");
+const playButton = document.querySelector("#play");
+const speed = document.querySelector("#speed");
+const speedText = document.querySelector("#speedText");
+const stepSize = document.querySelector("#stepSize");
+const jumpInput = document.querySelector("#jumpInput");
+const vertexInput = document.querySelector("#vertexInput");
+const frameTotal = document.querySelector("#frameTotal");
+const vertexTotal = document.querySelector("#vertexTotal");
+const dataSize = document.querySelector("#dataSize");
+const loadStatus = document.querySelector("#loadStatus");
+const toggleVertices = document.querySelector("#toggleVertices");
+const toggleCliques = document.querySelector("#toggleCliques");
+const toggleCliqueEdges = document.querySelector("#toggleCliqueEdges");
+const toggleCliqueAreas = document.querySelector("#toggleCliqueAreas");
+const toggleLayout = document.querySelector("#toggleLayout");
+const haskellInput = document.querySelector("#haskellInput");
+const compileButton = document.querySelector("#compileButton");
+const loadMainButton = document.querySelector("#loadMainButton");
+const compileOutput = document.querySelector("#compileOutput");
+const presetSelect = document.querySelector("#presetSelect");
+const presetNote = document.querySelector("#presetNote");
+const proseBody = document.querySelector("#proseBody");
+
+const cliquePalette = ["#f8d66d", "#9fd8cb", "#f4a3b4", "#b8c7ff", "#bde27a", "#f7b267", "#c7b8ea", "#91d5ff", "#f2c6de", "#d7e3a1"];
+const programPresets = [
+  {
+    chapter: "0. Introduction",
+    key: "Examples.Sandbox",
+    path: "Examples/Sandbox.hs",
+    label: "Sandbox introduction",
+    note: "A tiny editable module for trying the graph/species vocabulary.",
+    notePath: "Notes/sandbox.md",
+    defaultVertices: 6,
+  },
+  {
+    chapter: "1. Atoms and products",
+    key: "Examples.BasicGraphs",
+    path: "Examples/BasicGraphs.hs",
+    label: "Atoms and complete blocks",
+    note: "Discrete and indiscrete graphs as visual species atoms.",
+    notePath: "Notes/basic-graphs.md",
+    defaultVertices: 6,
+  },
+  {
+    chapter: "1. Atoms and products",
+    key: "Examples.NumbersUpToN",
+    path: "Examples/NumbersUpToN.hs",
+    label: "Numbers up to n",
+    note: "Ordered product: one contiguous cut for each number 0 through n.",
+    notePath: "Notes/numbers-up-to-n.md",
+    defaultVertices: 6,
+  },
+  {
+    chapter: "1. Atoms and products",
+    key: "Examples.PowersOfTwo",
+    path: "Examples/PowersOfTwo.hs",
+    label: "Powers of 2",
+    note: "Unordered product: every subset can be the marked block.",
+    notePath: "Notes/powers-of-two.md",
+    defaultVertices: 6,
+  },
+  {
+    chapter: "1. Atoms and products",
+    key: "Examples.BinomialCoefficients",
+    path: "Examples/BinomialCoefficients.hs",
+    label: "Binomial coefficients",
+    note: "Choose k marked vertices from n; default k = 2.",
+    notePath: "Notes/binomial-coefficients.md",
+    defaultVertices: 6,
+  },
+  {
+    chapter: "2. Ordered composition",
+    key: "Examples.Fibonacci",
+    path: "Examples/Fibonacci.hs",
+    label: "Fibonacci tilings",
+    note: "Ordered tilings by singleton and pair blocks.",
+    notePath: "Notes/fibonacci.md",
+    defaultVertices: 7,
+  },
+  {
+    chapter: "2. Ordered composition",
+    key: "Examples.TotalOrders",
+    path: "Examples/TotalOrders.hs",
+    label: "Total orders",
+    note: "All linear orders on n labelled vertices.",
+    notePath: "Notes/total-orders.md",
+    defaultVertices: 5,
+  },
+  {
+    chapter: "2. Ordered composition",
+    key: "Examples.TotalOrdersHasse",
+    path: "Examples/TotalOrdersHasse.hs",
+    label: "Total orders (Hasse)",
+    note: "All linear orders rendered with cover relations only.",
+    notePath: "Notes/total-orders-hasse.md",
+    defaultVertices: 5,
+  },
+  {
+    chapter: "3. Unordered composition",
+    key: "Examples.Equivalence",
+    path: "Examples/Equivalence.hs",
+    label: "Equivalence relations",
+    note: "Set partitions rendered as directed equivalence graphs.",
+    notePath: "Notes/equivalence.md",
+    defaultVertices: 5,
+  },
+  {
+    chapter: "3. Unordered composition",
+    key: "Examples.IntegerPartitions",
+    path: "Examples/IntegerPartitions.hs",
+    label: "Integer partitions",
+    note: "The unlabelled shadow of set partitions.",
+    notePath: "Notes/integer-partitions.md",
+    defaultVertices: 8,
+  },
+  {
+    chapter: "4. Recursive and cyclic classes",
+    key: "Examples.OrderedBinaryTrees",
+    path: "Examples/OrderedBinaryTrees.hs",
+    label: "Ordered binary trees",
+    note: "Plane binary tree shapes on n vertices, counted by Catalan numbers.",
+    notePath: "Notes/ordered-binary-trees.md",
+    defaultVertices: 5,
+  },
+  {
+    chapter: "4. Recursive and cyclic classes",
+    key: "Examples.CatalanTriangulations",
+    path: "Examples/CatalanTriangulations.hs",
+    label: "Catalan triangulations",
+    note: "Planar triangulations of a convex (n + 2)-gon.",
+    notePath: "Notes/catalan-triangulations.md",
+    defaultVertices: 5,
+  },
+  {
+    chapter: "4. Recursive and cyclic classes",
+    key: "Examples.MotzkinGraphs",
+    path: "Examples/MotzkinGraphs.hs",
+    label: "Motzkin graphs",
+    note: "Noncrossing partial matchings on n cyclically ordered vertices.",
+    notePath: "Notes/motzkin-graphs.md",
+    defaultVertices: 6,
+  },
+  {
+    chapter: "4. Recursive and cyclic classes",
+    key: "Examples.UnorderedBinaryTrees",
+    path: "Examples/UnorderedBinaryTrees.hs",
+    label: "Unordered binary trees",
+    note: "Binary tree shapes with left and right children identified.",
+    notePath: "Notes/unordered-binary-trees.md",
+    defaultVertices: 6,
+  },
+  {
+    chapter: "5. Actual graph species",
+    key: "Examples.SimpleGraphs",
+    path: "Examples/SimpleGraphs.hs",
+    label: "Simple graphs",
+    note: "All irreflexive undirected simple graphs on n labelled vertices.",
+    notePath: "Notes/simple-graphs.md",
+    defaultVertices: 4,
+  },
+  {
+    chapter: "5. Actual graph species",
+    key: "Examples.ConnectedGraphs",
+    path: "Examples/ConnectedGraphs.hs",
+    label: "Connected graphs",
+    note: "The connected part of the labelled simple graph species.",
+    notePath: "Notes/connected-graphs.md",
+    defaultVertices: 4,
+  },
+  {
+    chapter: "5. Actual graph species",
+    key: "Examples.UnlabelledSimpleGraphs",
+    path: "Examples/UnlabelledSimpleGraphs.hs",
+    label: "Unlabelled simple graphs",
+    note: "One representative for each simple graph shape.",
+    notePath: "Notes/unlabelled-simple-graphs.md",
+    defaultVertices: 5,
+  },
+  {
+    chapter: "5. Actual graph species",
+    key: "Examples.UnlabelledConnectedGraphs",
+    path: "Examples/UnlabelledConnectedGraphs.hs",
+    label: "Unlabelled connected graphs",
+    note: "One representative for each connected graph shape.",
+    notePath: "Notes/unlabelled-connected-graphs.md",
+    defaultVertices: 5,
+  },
+];
+const generatedFramesFile = "frames.jsonl";
+let currentModule = "Examples.Equivalence";
+let frames = [];
+let vertexCount = 0;
+let current = 0;
+let timer = null;
+let previousEdgeKeys = new Set();
+let positions = [];
+let currentVertices = [];
+let positionByVertex = new Map();
+let lastSizeKey = "";
+let showVertices = true;
+let colorCliques = false;
+let colorCliqueEdges = false;
+let shadeCliqueAreas = false;
+let layoutMode = "circle";
+
+function formatBytes(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "Unknown";
+  const units = ["B", "KB", "MB", "GB"];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return `${value.toFixed(value >= 10 || unit === 0 ? 0 : 1)} ${units[unit]}`;
+}
+
+function setOverlay(message) {
+  overlay.textContent = message;
+  overlay.classList.toggle("hidden", message === "");
+}
+
+function setCompileOutput(message, failed = false) {
+  compileOutput.textContent = message;
+  compileOutput.classList.toggle("bad", failed);
+}
+
+function populateProgramPresets() {
+  presetSelect.innerHTML = "";
+  let currentChapter = "";
+  let currentGroup = null;
+  programPresets.forEach((preset, index) => {
+    let parent = presetSelect;
+    if (preset.chapter) {
+      if (preset.chapter !== currentChapter) {
+        currentChapter = preset.chapter;
+        currentGroup = document.createElement("optgroup");
+        currentGroup.label = preset.chapter;
+        presetSelect.appendChild(currentGroup);
+      }
+      parent = currentGroup;
+    }
+
+    const option = document.createElement("option");
+    option.value = String(index);
+    option.textContent = preset.label;
+    parent.appendChild(option);
+  });
+  applyPresetVertexDefault(programPresets[0]);
+  updatePresetNote();
+}
+
+function updatePresetNote() {
+  const preset = programPresets[Number(presetSelect.value)] || programPresets[0];
+  presetNote.textContent = preset ? preset.note : "";
+  renderPresetProse(preset);
+}
+
+function applyPresetVertexDefault(preset) {
+  if (!preset || preset.defaultVertices === undefined) return;
+  const nextValue = Number(preset.defaultVertices);
+  if (Number.isFinite(nextValue) && nextValue >= 0) {
+    vertexInput.value = String(Math.floor(nextValue));
+  }
+}
+
+async function renderPresetProse(preset) {
+  proseBody.textContent = "";
+  if (!preset || !preset.notePath) {
+    renderNoteText("No mathematical note is available for this program.");
+    return;
+  }
+
+  renderNoteText("Loading note...");
+  try {
+    const response = await fetch(`${preset.notePath}?t=${Date.now()}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    renderNoteText(await response.text());
+  } catch (error) {
+    renderNoteText(`Could not load ${preset.notePath}: ${String(error.message || error)}`);
+  }
+}
+
+function renderNoteText(noteText) {
+  proseBody.textContent = "";
+  parseNoteBlocks(noteText).forEach((block) => {
+    if (block.type === "code") {
+      const pre = document.createElement("pre");
+      const code = document.createElement("code");
+      code.textContent = block.text;
+      pre.appendChild(code);
+      proseBody.appendChild(pre);
+      return;
+    }
+
+    const paragraph = document.createElement("p");
+    if (block.type === "heading") paragraph.className = "note-heading";
+    appendInlineCode(paragraph, block.text);
+    proseBody.appendChild(paragraph);
+  });
+
+  if (window.MathJax && window.MathJax.typesetPromise) {
+    window.MathJax.typesetPromise([proseBody]).catch(() => {});
+  }
+}
+
+function parseNoteBlocks(noteText) {
+  const blocks = [];
+  const lines = noteText.replace(/\r\n/g, "\n").split("\n");
+  let paragraph = [];
+  let codeLines = [];
+  let inCode = false;
+
+  function flushParagraph() {
+    if (!paragraph.length) return;
+    const text = paragraph.join(" ").replace(/\s+/g, " ").trim();
+    if (text.startsWith("# ")) blocks.push({ type: "heading", text: text.slice(2) });
+    else blocks.push({ type: "paragraph", text });
+    paragraph = [];
+  }
+
+  lines.forEach((line) => {
+    if (line.trim().startsWith("```")) {
+      if (inCode) {
+        blocks.push({ type: "code", text: codeLines.join("\n") });
+        codeLines = [];
+        inCode = false;
+      } else {
+        flushParagraph();
+        inCode = true;
+      }
+      return;
+    }
+
+    if (inCode) {
+      codeLines.push(line);
+      return;
+    }
+
+    if (!line.trim()) flushParagraph();
+    else paragraph.push(line);
+  });
+
+  if (inCode) blocks.push({ type: "code", text: codeLines.join("\n") });
+  flushParagraph();
+  return blocks;
+}
+
+function appendInlineCode(parent, text) {
+  text.split(/(`[^`]+`)/g).forEach((part) => {
+    if (!part) return;
+    if (part.startsWith("`") && part.endsWith("`")) {
+      const code = document.createElement("code");
+      code.textContent = part.slice(1, -1);
+      parent.appendChild(code);
+    } else {
+      parent.appendChild(document.createTextNode(part));
+    }
+  });
+}
+
+function parseJsonLines(text) {
+  return text.split(/\r?\n/g).filter(Boolean).map((line) => JSON.parse(line));
+}
+
+function frameVertices(frame) {
+  if (Array.isArray(frame.v)) {
+    return frame.v.map((vertex) => Number(vertex)).filter((vertex) => Number.isFinite(vertex));
+  }
+  const count = Math.max(0, Math.floor(Number(frame.n) || 0));
+  return Array.from({ length: count }, (_, index) => index);
+}
+
+function frameEdges(frame) {
+  return Array.isArray(frame.e) ? frame.e : [];
+}
+
+function resizeCanvas() {
+  const rect = stage.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  const width = Math.max(520, Math.floor(rect.width));
+  const height = Math.max(420, Math.floor(rect.height));
+  const sizeKey = `${width}x${height}x${dpr}x${vertexCount}x${layoutMode}`;
+
+  if (lastSizeKey === sizeKey) return;
+  lastSizeKey = sizeKey;
+  canvas.width = Math.floor(width * dpr);
+  canvas.height = Math.floor(height * dpr);
+  canvas.style.width = `${width}px`;
+  canvas.style.height = `${height}px`;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  positions =
+    layoutMode === "line" ? linePositions(width, height, vertexCount)
+    : circlePositions(width, height, vertexCount);
+  positionByVertex = new Map(currentVertices.map((vertex, index) => [vertex, positions[index]]));
+}
+
+function circlePositions(width, height, count) {
+  const cx = width / 2;
+  const cy = height / 2;
+  const radius = Math.max(90, Math.min(width, height) * 0.36);
+  return Array.from({ length: count }, (_, index) => {
+    const angle = -Math.PI / 2 + 2 * Math.PI * index / Math.max(count, 1);
+    return { x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) };
+  });
+}
+
+function linePositions(width, height, count) {
+  if (count <= 0) return [];
+  if (count === 1) return [{ x: width / 2, y: height / 2 }];
+
+  const padding = showVertices ? 62 : 36;
+  const usableWidth = Math.max(1, width - padding * 2);
+  const y = height / 2;
+  return Array.from({ length: count }, (_, index) => ({
+    x: padding + usableWidth * index / (count - 1),
+    y,
+  }));
+}
+
+function edgeKey(edge) {
+  const [a, b] = edge;
+  return `${a}->${b}`;
+}
+
+function cliqueColorModel(frame, vertices) {
+  const count = vertices.length;
+  const edgeKeys = new Set(frameEdges(frame).map(edgeKey));
+  const neighbors = Array.from({ length: count }, () => []);
+
+  for (let left = 0; left < count; left += 1) {
+    for (let right = left + 1; right < count; right += 1) {
+      const a = vertices[left];
+      const b = vertices[right];
+      if (edgeKeys.has(`${a}->${b}`) && edgeKeys.has(`${b}->${a}`)) {
+        neighbors[left].push(right);
+        neighbors[right].push(left);
+      }
+    }
+  }
+
+  const colors = Array(count).fill("#f8d66d");
+  const groups = Array(count).fill(-1);
+  const seen = Array(count).fill(false);
+  let cliqueIndex = 0;
+
+  for (let start = 0; start < count; start += 1) {
+    if (seen[start]) continue;
+    const component = [];
+    const stack = [start];
+    seen[start] = true;
+
+    while (stack.length) {
+      const vertex = stack.pop();
+      component.push(vertex);
+      neighbors[vertex].forEach((next) => {
+        if (!seen[next]) {
+          seen[next] = true;
+          stack.push(next);
+        }
+      });
+    }
+
+    const color = cliquePalette[cliqueIndex % cliquePalette.length];
+    component.forEach((vertexIndex) => {
+      colors[vertexIndex] = color;
+      groups[vertexIndex] = cliqueIndex;
+    });
+    cliqueIndex += 1;
+  }
+
+  return { colors, groups };
+}
+
+function edgeStyle(edge, isNew) {
+  // To re-enable new-edge highlighting, use:
+  // color: isNew ? "#ef476f" : "#26547c"
+  return { color: "#26547c", width: 4, alpha: 0.92 };
+}
+
+function shortenEdge(from, to, radius) {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const length = Math.hypot(dx, dy) || 1;
+  const ux = dx / length;
+  const uy = dy / length;
+  return {
+    start: { x: from.x + ux * radius, y: from.y + uy * radius },
+    end: { x: to.x - ux * radius, y: to.y - uy * radius },
+  };
+}
+
+function lineArcSegment(from, to, radius) {
+  const offset = to.x < from.x ? radius : -radius;
+  return {
+    start: { x: from.x, y: from.y + offset },
+    end: { x: to.x, y: to.y + offset },
+  };
+}
+
+function drawArrowhead(from, to, style) {
+  const angle = Math.atan2(to.y - from.y, to.x - from.x);
+  const size = 17;
+  ctx.save();
+  ctx.globalAlpha = style.alpha;
+  ctx.fillStyle = style.color;
+  ctx.beginPath();
+  ctx.moveTo(to.x, to.y);
+  ctx.lineTo(to.x - size * Math.cos(angle - Math.PI / 7), to.y - size * Math.sin(angle - Math.PI / 7));
+  ctx.lineTo(to.x - size * Math.cos(angle + Math.PI / 7), to.y - size * Math.sin(angle + Math.PI / 7));
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function circularArc(start, end) {
+  const chord = Math.max(1, Math.abs(end.x - start.x));
+  const cx = (start.x + end.x) / 2;
+  const baseline = (start.y + end.y) / 2;
+  const below = end.x < start.x;
+  const radius = chord / 2;
+  const startAngle = below ? 0 : Math.PI;
+  const endAngle = below ? Math.PI : 0;
+  const anticlockwise = false;
+  return {
+    cx,
+    cy: baseline,
+    radius,
+    startAngle,
+    endAngle,
+    anticlockwise,
+  };
+}
+
+function drawEdgeSegment(segment, style) {
+  ctx.beginPath();
+
+  if (layoutMode === "line") {
+    const arc = circularArc(segment.start, segment.end);
+    ctx.arc(arc.cx, arc.cy, arc.radius, arc.startAngle, arc.endAngle, arc.anticlockwise);
+    ctx.stroke();
+    return;
+  }
+
+  ctx.moveTo(segment.start.x, segment.start.y);
+  ctx.lineTo(segment.end.x, segment.end.y);
+  ctx.stroke();
+  drawArrowhead(segment.start, segment.end, style);
+}
+
+function drawLineEdge(from, to, radius, style) {
+  drawEdgeSegment(lineArcSegment(from, to, radius), style);
+}
+
+function cliqueGroups(cliqueModel) {
+  const groups = new Map();
+  cliqueModel.groups.forEach((group, index) => {
+    if (group < 0) return;
+    if (!groups.has(group)) groups.set(group, []);
+    groups.get(group).push(index);
+  });
+  return Array.from(groups.entries());
+}
+
+function drawCliqueAreas(cliqueModel) {
+  cliqueGroups(cliqueModel).forEach(([group, indices]) => {
+    const points = indices.map((index) => positions[index]).filter(Boolean);
+    if (!points.length) return;
+    const color = cliqueModel.colors[indices[0]] || cliquePalette[group % cliquePalette.length];
+
+    ctx.save();
+    ctx.globalAlpha = 0.22;
+    ctx.fillStyle = color;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+
+    if (points.length === 1) {
+      ctx.beginPath();
+      ctx.arc(points[0].x, points[0].y, showVertices ? 38 : 24, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 0.45;
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
+
+    if (points.length === 2) {
+      drawCapsule(points[0], points[1], showVertices ? 38 : 24);
+      ctx.fill();
+      ctx.globalAlpha = 0.45;
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
+
+    const hull = paddedRadialHull(points, showVertices ? 34 : 22);
+    ctx.beginPath();
+    hull.forEach((point, index) => {
+      if (index === 0) ctx.moveTo(point.x, point.y);
+      else ctx.lineTo(point.x, point.y);
+    });
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 0.45;
+    ctx.stroke();
+    ctx.restore();
+  });
+}
+
+function drawCapsule(a, b, radius) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const length = Math.hypot(dx, dy) || 1;
+  const nx = -dy / length * radius;
+  const ny = dx / length * radius;
+
+  ctx.beginPath();
+  ctx.moveTo(a.x + nx, a.y + ny);
+  ctx.lineTo(b.x + nx, b.y + ny);
+  ctx.arc(b.x, b.y, radius, Math.atan2(ny, nx), Math.atan2(-ny, -nx));
+  ctx.lineTo(a.x - nx, a.y - ny);
+  ctx.arc(a.x, a.y, radius, Math.atan2(-ny, -nx), Math.atan2(ny, nx));
+  ctx.closePath();
+}
+
+function paddedRadialHull(points, padding) {
+  const center = points.reduce(
+    (sum, point) => ({ x: sum.x + point.x / points.length, y: sum.y + point.y / points.length }),
+    { x: 0, y: 0 }
+  );
+
+  return points
+    .slice()
+    .sort((a, b) => Math.atan2(a.y - center.y, a.x - center.x) - Math.atan2(b.y - center.y, b.x - center.x))
+    .map((point) => {
+      const dx = point.x - center.x;
+      const dy = point.y - center.y;
+      const length = Math.hypot(dx, dy) || 1;
+      return {
+        x: point.x + dx / length * padding,
+        y: point.y + dy / length * padding,
+      };
+    });
+}
+
+function drawFrame() {
+  if (!frames.length) {
+    vertexCount = 0;
+    resizeCanvas();
+    ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+    title.textContent = "No frames loaded";
+    count.textContent = "0 / 0";
+    vertexTotal.textContent = "0";
+    playButton.disabled = true;
+    return;
+  }
+
+  const frame = frames[((current % frames.length) + frames.length) % frames.length];
+  const vertices = frameVertices(frame);
+  const vertexKey = vertices.join(",");
+  if (currentVertices.join(",") !== vertexKey || vertexCount !== vertices.length) {
+    currentVertices = vertices;
+    vertexCount = vertices.length;
+    lastSizeKey = "";
+  }
+  resizeCanvas();
+  const width = canvas.clientWidth;
+  const height = canvas.clientHeight;
+  ctx.clearRect(0, 0, width, height);
+
+  const edges = frameEdges(frame);
+  const nextEdgeKeys = new Set(edges.map(edgeKey));
+  const vertexIndex = new Map(currentVertices.map((vertex, index) => [vertex, index]));
+  const cliqueModel = (colorCliques || colorCliqueEdges || shadeCliqueAreas)
+    ? cliqueColorModel(frame, currentVertices)
+    : null;
+
+  if (shadeCliqueAreas && cliqueModel) {
+    drawCliqueAreas(cliqueModel);
+  }
+
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  edges.forEach((edge) => {
+    const [a, b] = edge;
+    const from = positionByVertex.get(a);
+    const to = positionByVertex.get(b);
+    if (!from || !to) return;
+    const key = edgeKey(edge);
+    const style = edgeStyle(edge, !previousEdgeKeys.has(key));
+    const aIndex = vertexIndex.get(a);
+    const bIndex = vertexIndex.get(b);
+    if (
+      colorCliqueEdges
+      && cliqueModel
+      && aIndex !== undefined
+      && bIndex !== undefined
+      && cliqueModel.groups[aIndex] >= 0
+      && cliqueModel.groups[aIndex] === cliqueModel.groups[bIndex]
+      && nextEdgeKeys.has(`${b}->${a}`)
+      && a !== b
+    ) {
+      style.color = cliqueModel.colors[aIndex];
+      style.width = 3.2;
+      style.alpha = 0.82;
+    }
+    const nodeRadius = showVertices ? 23 : 0;
+    ctx.strokeStyle = style.color;
+    ctx.lineWidth = style.width;
+    ctx.globalAlpha = style.alpha;
+    if (layoutMode === "line") {
+      drawLineEdge(from, to, nodeRadius, style);
+    } else {
+      drawEdgeSegment(shortenEdge(from, to, nodeRadius), style);
+    }
+  });
+  ctx.globalAlpha = 1;
+
+  if (showVertices) {
+    const fills = colorCliques && cliqueModel ? cliqueModel.colors : null;
+    currentVertices.forEach((vertex, index) => {
+      const point = positions[index];
+      if (!point) return;
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, 23, 0, Math.PI * 2);
+      ctx.fillStyle = fills ? fills[index] : "#f8d66d";
+      ctx.fill();
+      ctx.strokeStyle = "#263238";
+      ctx.lineWidth = 2.4;
+      ctx.stroke();
+
+      ctx.fillStyle = "#17212a";
+      ctx.font = "800 18px Inter, system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(String(vertex), point.x, point.y + 1);
+    });
+  }
+
+  previousEdgeKeys = nextEdgeKeys;
+  title.textContent = `Frame ${current + 1}`;
+  count.textContent = `${current + 1} / ${frames.length.toLocaleString()}`;
+  vertexTotal.textContent = String(vertexCount);
+  playButton.disabled = frames.length <= 1;
+  jumpInput.max = String(frames.length);
+}
+
+function stop() {
+  if (timer !== null) window.clearInterval(timer);
+  timer = null;
+  playButton.textContent = "Play";
+}
+
+function frameStep() {
+  const value = Number(stepSize.value);
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : 1;
+}
+
+function advance(delta) {
+  if (!frames.length) return;
+  current = (current + delta + frames.length) % frames.length;
+  drawFrame();
+}
+
+function play() {
+  if (frames.length <= 1) return;
+  stop();
+  playButton.textContent = "Pause";
+  timer = window.setInterval(() => advance(frameStep()), 1000 / framesPerSecond());
+}
+
+function framesPerSecond() {
+  const value = Number(speed.value);
+  return Number.isFinite(value) && value > 0 ? value : 12;
+}
+
+function requestedVertexCount() {
+  const value = Math.floor(Number(vertexInput.value));
+  if (!Number.isFinite(value)) return 6;
+  return Math.max(0, value);
+}
+
+async function loadFrames() {
+  stop();
+  setOverlay("Loading generated frames...");
+  loadStatus.textContent = "Fetching";
+  try {
+    const response = await fetch(`${generatedFramesFile}?t=${Date.now()}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const text = await response.text();
+    const responseBytes = Number(response.headers.get("content-length")) || text.length;
+    loadStatus.textContent = "Parsing";
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
+    applyFramesText(text, responseBytes);
+  } catch (error) {
+    showFrameLoadFailure(`Could not load generated frames: ${String(error.message || error)}`);
+  }
+}
+
+function applyFramesText(text, byteLength = null) {
+  frames = parseJsonLines(text);
+  vertexCount = 0;
+  currentVertices = [];
+  positionByVertex = new Map();
+  current = 0;
+  previousEdgeKeys = new Set();
+  lastSizeKey = "";
+  frameTotal.textContent = frames.length.toLocaleString();
+  vertexTotal.textContent = String(vertexCount);
+  dataSize.textContent = formatBytes(byteLength === null ? text.length : byteLength);
+  loadStatus.textContent = "Loaded";
+  setOverlay("");
+  drawFrame();
+}
+
+function showFrameLoadFailure(message) {
+  frames = [];
+  vertexCount = 0;
+  currentVertices = [];
+  positionByVertex = new Map();
+  frameTotal.textContent = "0";
+  vertexTotal.textContent = "0";
+  loadStatus.textContent = "Failed";
+  setOverlay(message);
+  drawFrame();
+}
+
+async function loadHaskellSource(preset = null) {
+  const nextPreset = preset || programPresets[Number(presetSelect.value)] || programPresets[0];
+  currentModule = nextPreset.key;
+  setCompileOutput(`Loading app/${nextPreset.path}...`);
+  try {
+    const response = await fetch(`${nextPreset.path}?t=${Date.now()}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    haskellInput.value = await response.text();
+    setCompileOutput(`Loaded app/${nextPreset.path}.`);
+  } catch (error) {
+    setCompileOutput(`Could not load ${nextPreset.path}: ${String(error.message || error)}`, true);
+  }
+}
+
+async function loadPresetSource() {
+  updatePresetNote();
+  const preset = programPresets[Number(presetSelect.value)] || programPresets[0];
+  applyPresetVertexDefault(preset);
+  await loadHaskellSource(preset);
+}
+
+async function compileHaskell() {
+  stop();
+  compileButton.disabled = true;
+  setCompileOutput("Compiling and running Haskell...");
+  loadStatus.textContent = "Compiling";
+
+  try {
+    const response = await fetch("/compile-haskell", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        source: haskellInput.value,
+        module: currentModule,
+        vertices: requestedVertexCount(),
+      }),
+    });
+    const contentType = response.headers.get("content-type") || "";
+    const payload = contentType.includes("application/json")
+      ? await response.json()
+      : { ok: false, error: await response.text() };
+
+    if (!response.ok || !payload.ok) {
+      const details = [payload.error || `HTTP ${response.status}`, payload.output || ""].filter(Boolean).join("\n\n");
+      throw new Error(details);
+    }
+
+    setCompileOutput(payload.output || "Compiled and ran successfully.");
+    if (typeof payload.framesText === "string") {
+      applyFramesText(payload.framesText, payload.framesText.length);
+    } else {
+      await loadFrames();
+    }
+  } catch (error) {
+    loadStatus.textContent = "Compile failed";
+    const message = String(error.message || error);
+    const hint = /Failed to fetch|NetworkError|Load failed/i.test(message)
+      ? "The local compile server did not return a response. Restart graph_server.py if the page stops responding, then try a smaller vertex count."
+      : "If the compile endpoint is missing, run this page through graph_server.py instead of a plain static server.";
+    setCompileOutput(`${message}\n\n${hint}`, true);
+  } finally {
+    compileButton.disabled = false;
+  }
+}
+
+compileButton.addEventListener("click", compileHaskell);
+loadMainButton.addEventListener("click", () => {
+  currentModule = "Main";
+  setCompileOutput("Loading app/Main.hs...");
+  fetch(`Main.hs?t=${Date.now()}`)
+    .then((response) => {
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.text();
+    })
+    .then((source) => {
+      haskellInput.value = source;
+      presetNote.textContent = "Raw app/Main.hs.";
+      setCompileOutput("Loaded app/Main.hs.");
+    })
+    .catch((error) => setCompileOutput(`Could not load Main.hs: ${String(error.message || error)}`, true));
+});
+presetSelect.addEventListener("change", loadPresetSource);
+toggleVertices.addEventListener("click", () => {
+  showVertices = !showVertices;
+  toggleVertices.textContent = showVertices ? "Hide vertices" : "Show vertices";
+  lastSizeKey = "";
+  drawFrame();
+});
+toggleCliques.addEventListener("click", () => {
+  colorCliques = !colorCliques;
+  toggleCliques.textContent = colorCliques ? "Plain vertices" : "Color cliques";
+  drawFrame();
+});
+toggleCliqueEdges.addEventListener("click", () => {
+  colorCliqueEdges = !colorCliqueEdges;
+  toggleCliqueEdges.textContent = colorCliqueEdges ? "Plain edges" : "Color clique edges";
+  drawFrame();
+});
+toggleCliqueAreas.addEventListener("click", () => {
+  shadeCliqueAreas = !shadeCliqueAreas;
+  toggleCliqueAreas.textContent = shadeCliqueAreas ? "Plain areas" : "Shade cliques";
+  drawFrame();
+});
+toggleLayout.addEventListener("click", () => {
+  layoutMode = layoutMode === "circle" ? "line" : "circle";
+  toggleLayout.textContent = layoutMode === "circle" ? "Line arcs" : "Circle layout";
+  lastSizeKey = "";
+  drawFrame();
+});
+document.querySelector("#prev").addEventListener("click", () => { stop(); advance(-frameStep()); });
+document.querySelector("#next").addEventListener("click", () => { stop(); advance(frameStep()); });
+playButton.addEventListener("click", () => timer === null ? play() : stop());
+document.querySelector("#jumpButton").addEventListener("click", () => {
+  if (!frames.length) return;
+  stop();
+  const target = Math.min(frames.length, Math.max(1, Math.floor(Number(jumpInput.value) || 1)));
+  current = target - 1;
+  previousEdgeKeys = new Set();
+  drawFrame();
+});
+speed.addEventListener("input", () => {
+  speedText.textContent = `${framesPerSecond()} FPS`;
+  if (timer !== null) play();
+});
+window.addEventListener("resize", () => { lastSizeKey = ""; drawFrame(); });
+
+playButton.disabled = true;
+speedText.textContent = `${framesPerSecond()} FPS`;
+populateProgramPresets();
+loadPresetSource();
+loadFrames();
+</script>
+</body>
+</html>
