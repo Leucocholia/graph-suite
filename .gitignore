@@ -1,0 +1,13 @@
+dist-newstyle/
+.compile-work/
+
+graph-suite-*/
+frames.jsonl
+app/frames.jsonl
+
+app/__pycache__/
+*.pyc
+
+*.log
+*.out.log
+*.err.log
