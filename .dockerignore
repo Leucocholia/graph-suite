@@ -1,0 +1,13 @@
+dist-newstyle/
+.compile-work/
+graph-suite-*/
+
+app/__pycache__/
+app/**/*.hi
+app/**/*.o
+app/*.exe
+app/*.log
+
+app/2regular.jsonl
+app/equivalence.jsonl
+app/graphs.jsonl
