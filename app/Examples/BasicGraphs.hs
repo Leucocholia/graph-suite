@@ -55,6 +55,19 @@ clique n =
       | n > 0 = RejectsEmptyLabels
       | otherwise = UnknownEmptyLabels
 
+reflexiveClique :: AsVertices a => Int -> Species a Graph
+reflexiveClique n =
+  speciesWithEmptySupport support $ \atoms ->
+    let vertices = concatMap asVertices atoms
+    in
+      if length vertices == n
+      then runSpecies reflexiveComplete atoms
+      else []
+  where
+    support
+      | n > 0 = RejectsEmptyLabels
+      | otherwise = UnknownEmptyLabels
+
 graphWith :: AsVertices a => ([Vertex] -> [Edge]) -> Species a Graph
 graphWith edgePattern =
   Species $ \atoms ->

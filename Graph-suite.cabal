@@ -62,6 +62,7 @@ executable Graph-suite
                    GraphRenderer
                    Examples.BasicGraphs
                    Examples.BinomialCoefficients
+                   Examples.BinomialCoefficientSums
                    Examples.BinomialLatticePaths
                    Examples.CatalanTriangulations
                    Examples.ConnectedGraphs
@@ -74,7 +75,7 @@ executable Graph-suite
                    Examples.NumbersUpToN
                    Examples.OrderedBinaryTrees
                    Examples.PowersOfTwo
-                   Examples.RecursiveTotalOrders
+                   Examples.Factorial
                    Examples.Sandbox
                    Examples.SimpleGraphs
                    Examples.TotalOrders

@@ -113,6 +113,19 @@
     line-height: 1.62;
   }
 
+  .prose-panel ul {
+    margin: 0;
+    padding-left: 1.2rem;
+    display: grid;
+    gap: 8px;
+  }
+
+  .prose-panel li {
+    color: var(--ink);
+    font-size: 1rem;
+    line-height: 1.55;
+  }
+
   .prose-panel p.note-heading {
     margin-top: 8px;
     font-weight: 800;
@@ -240,10 +253,13 @@
     <div class="controls">
       <button id="toggleVertices" type="button">Hide vertices</button>
       <button id="toggleCliques" type="button">Color cliques</button>
-      <button id="toggleCliqueEdges" type="button">Color clique edges</button>
-      <button id="toggleCliqueAreas" type="button">Shade cliques</button>
       <button id="toggleLayout" type="button">Line arcs</button>
     </div>
+
+    <label>
+      Color palette
+      <select id="paletteSelect"></select>
+    </label>
 
     <label>
       Program preset
@@ -263,14 +279,10 @@
 
     <div class="controls">
       <button id="compileButton" class="primary" type="button">Compile &amp; run</button>
-      <button id="loadMainButton" type="button">Load Main.hs</button>
     </div>
     <pre id="compileOutput" class="compiler-output" aria-live="polite">Ready to compile.</pre>
 
     <div class="stats" aria-live="polite">
-      <div class="stat"><span>Frames</span><strong id="frameTotal">0</strong></div>
-      <div class="stat"><span>Vertices</span><strong id="vertexTotal">0</strong></div>
-      <div class="stat"><span>Data size</span><strong id="dataSize">Not loaded</strong></div>
       <div class="stat"><span>Load status</span><strong id="loadStatus">Ready</strong></div>
     </div>
 
@@ -328,24 +340,37 @@ const speedText = document.querySelector("#speedText");
 const stepSize = document.querySelector("#stepSize");
 const jumpInput = document.querySelector("#jumpInput");
 const vertexInput = document.querySelector("#vertexInput");
-const frameTotal = document.querySelector("#frameTotal");
-const vertexTotal = document.querySelector("#vertexTotal");
-const dataSize = document.querySelector("#dataSize");
 const loadStatus = document.querySelector("#loadStatus");
 const toggleVertices = document.querySelector("#toggleVertices");
 const toggleCliques = document.querySelector("#toggleCliques");
-const toggleCliqueEdges = document.querySelector("#toggleCliqueEdges");
-const toggleCliqueAreas = document.querySelector("#toggleCliqueAreas");
 const toggleLayout = document.querySelector("#toggleLayout");
 const haskellInput = document.querySelector("#haskellInput");
 const compileButton = document.querySelector("#compileButton");
-const loadMainButton = document.querySelector("#loadMainButton");
 const compileOutput = document.querySelector("#compileOutput");
 const presetSelect = document.querySelector("#presetSelect");
+const paletteSelect = document.querySelector("#paletteSelect");
 const presetNote = document.querySelector("#presetNote");
 const proseBody = document.querySelector("#proseBody");
 
-const cliquePalette = ["#f8d66d", "#9fd8cb", "#f4a3b4", "#b8c7ff", "#bde27a", "#f7b267", "#c7b8ea", "#91d5ff", "#f2c6de", "#d7e3a1"];
+const cliquePalettes = [
+  {
+    name: "Soft",
+    colors: ["#f8d66d", "#9fd8cb", "#f4a3b4", "#b8c7ff", "#bde27a", "#f7b267", "#c7b8ea", "#91d5ff", "#f2c6de", "#d7e3a1"],
+  },
+  {
+    name: "Bright",
+    colors: ["#ffbe0b", "#06d6a0", "#ef476f", "#118ab2", "#8338ec", "#fb5607", "#3a86ff", "#80ed99", "#ff70a6", "#7bdff2"],
+  },
+  {
+    name: "Studio",
+    colors: ["#e9c46a", "#2a9d8f", "#e76f51", "#457b9d", "#8d99ae", "#f4a261", "#a7c957", "#b5838d", "#48cae4", "#cdb4db"],
+  },
+  {
+    name: "High contrast",
+    colors: ["#ffd166", "#06d6a0", "#ef476f", "#118ab2", "#073b4c", "#f77f00", "#7209b7", "#90be6d", "#577590", "#f15bb5"],
+  },
+];
+let cliquePalette = cliquePalettes[0].colors;
 const programPresets = [
   {
     chapter: "0. Introduction",
@@ -402,7 +427,16 @@ const programPresets = [
     defaultVertices: 6,
   },
   {
-    chapter: "2. Ordered composition",
+    chapter: "1. Atoms and products",
+    key: "Examples.BinomialCoefficientSums",
+    path: "Examples/BinomialCoefficientSums.hs",
+    label: "Sums of binomial coefficients",
+    note: "Species sum adds the frame counts of disjoint alternatives.",
+    notePath: "Notes/binomial-coefficient-sums.md",
+    defaultVertices: 6,
+  },
+  {
+    chapter: "2. Recursion",
     key: "Examples.EvenLength",
     path: "Examples/EvenLength.hs",
     label: "Even length",
@@ -411,7 +445,7 @@ const programPresets = [
     defaultVertices: 6,
   },
   {
-    chapter: "2. Ordered composition",
+    chapter: "2. Recursion",
     key: "Examples.Fibonacci",
     path: "Examples/Fibonacci.hs",
     label: "Fibonacci tilings",
@@ -420,93 +454,12 @@ const programPresets = [
     defaultVertices: 7,
   },
   {
-    chapter: "2. Ordered composition",
-    key: "Examples.RecursiveTotalOrders",
-    path: "Examples/RecursiveTotalOrders.hs",
-    label: "Total orders by recursion",
+    chapter: "2. Recursion",
+    key: "Examples.Factorial",
+    path: "Examples/Factorial.hs",
+    label: "Factorial",
     note: "Choose one singleton, then recursively order the remaining labels.",
-    notePath: "Notes/recursive-total-orders.md",
-    defaultVertices: 5,
-  },
-  {
-    chapter: "3. Unordered composition",
-    key: "Examples.Equivalence",
-    path: "Examples/Equivalence.hs",
-    label: "Equivalence relations",
-    note: "Set partitions rendered as directed equivalence graphs.",
-    notePath: "Notes/equivalence.md",
-    defaultVertices: 5,
-  },
-  {
-    chapter: "3. Unordered composition",
-    key: "Examples.IntegerPartitions",
-    path: "Examples/IntegerPartitions.hs",
-    label: "Integer partitions",
-    note: "The unlabelled shadow of set partitions.",
-    notePath: "Notes/integer-partitions.md",
-    defaultVertices: 8,
-  },
-  {
-    chapter: "4. Recursive and cyclic classes",
-    key: "Examples.OrderedBinaryTrees",
-    path: "Examples/OrderedBinaryTrees.hs",
-    label: "Ordered binary trees",
-    note: "Plane binary tree shapes on n vertices, counted by Catalan numbers.",
-    notePath: "Notes/ordered-binary-trees.md",
-    defaultVertices: 5,
-  },
-  {
-    chapter: "4. Recursive and cyclic classes",
-    key: "Examples.MotzkinGraphs",
-    path: "Examples/MotzkinGraphs.hs",
-    label: "Motzkin graphs",
-    note: "Noncrossing partial matchings on n cyclically ordered vertices.",
-    notePath: "Notes/motzkin-graphs.md",
-    defaultVertices: 6,
-  },
-  {
-    chapter: "4. Recursive and cyclic classes",
-    key: "Examples.UnorderedBinaryTrees",
-    path: "Examples/UnorderedBinaryTrees.hs",
-    label: "Unordered binary trees",
-    note: "Binary tree shapes with left and right children identified.",
-    notePath: "Notes/unordered-binary-trees.md",
-    defaultVertices: 6,
-  },
-  {
-    chapter: "5. Actual graph species",
-    key: "Examples.SimpleGraphs",
-    path: "Examples/SimpleGraphs.hs",
-    label: "Simple graphs",
-    note: "All irreflexive undirected simple graphs on n labelled vertices.",
-    notePath: "Notes/simple-graphs.md",
-    defaultVertices: 4,
-  },
-  {
-    chapter: "5. Actual graph species",
-    key: "Examples.ConnectedGraphs",
-    path: "Examples/ConnectedGraphs.hs",
-    label: "Connected graphs",
-    note: "The connected part of the labelled simple graph species.",
-    notePath: "Notes/connected-graphs.md",
-    defaultVertices: 4,
-  },
-  {
-    chapter: "5. Actual graph species",
-    key: "Examples.UnlabelledSimpleGraphs",
-    path: "Examples/UnlabelledSimpleGraphs.hs",
-    label: "Unlabelled simple graphs",
-    note: "One representative for each simple graph shape.",
-    notePath: "Notes/unlabelled-simple-graphs.md",
-    defaultVertices: 5,
-  },
-  {
-    chapter: "5. Actual graph species",
-    key: "Examples.UnlabelledConnectedGraphs",
-    path: "Examples/UnlabelledConnectedGraphs.hs",
-    label: "Unlabelled connected graphs",
-    note: "One representative for each connected graph shape.",
-    notePath: "Notes/unlabelled-connected-graphs.md",
+    notePath: "Notes/factorial.md",
     defaultVertices: 5,
   },
 ];
@@ -530,51 +483,29 @@ output = complete * empty
 chosenSize = 2
 
 output :: Species Vertex Graph
-output = empty * choose chosenSize complete
+output = clique chosenSize * empty
+`,
+  "Examples.BinomialCoefficientSums": `output :: Species Vertex Graph
+output = binomialTerm 0 + binomialTerm 1 + binomialTerm 2 + binomialTerm 3
+
+binomialTerm :: Int -> Species Vertex Graph
+binomialTerm k = clique k * empty
 `,
   "Examples.EvenLength": `output :: Species Vertex Graph
-output = unionGraphs <|> clique 2
+output = clique 0 + clique 2 *|* output
 `,
   "Examples.Fibonacci": `output :: Species Vertex Graph
-output = unionGraphs <|> tile
+output = clique 0 + tile *|* output
 
 tile :: Species Vertex Graph
-tile =
-  onTupleN 1 complete + onTupleN 2 complete
+tile = clique 1 + clique 2
 `,
-  "Examples.RecursiveTotalOrders": `output :: Species Vertex Graph
-output = clique 1 + ((clique 1 *> joinTwoGraphs) output)
-`,
-  "Examples.Equivalence": `output :: Species Vertex Graph
-output = unionGraphs <@> complete
-`,
-  "Examples.IntegerPartitions": `output :: Species Vertex Graph
-output = integerPartsOf complete
-`,
-  "Examples.OrderedBinaryTrees": `output :: Species Vertex Graph
-output = orderedBinaryTrees
-`,
-  "Examples.MotzkinGraphs": `output :: CyclicSpecies Vertex Graph
-output = motzkinGraphs
-`,
-  "Examples.UnorderedBinaryTrees": `output :: Species Vertex Graph
-output = unorderedBinaryTrees
-`,
-  "Examples.SimpleGraphs": `output :: Species Vertex Graph
-output = simpleGraphs
-`,
-  "Examples.ConnectedGraphs": `output :: Species Vertex Graph
-output = connectedSimpleGraphs
-`,
-  "Examples.UnlabelledSimpleGraphs": `output :: Species Vertex Graph
-output = unlabelledSimpleGraphs
-`,
-  "Examples.UnlabelledConnectedGraphs": `output :: Species Vertex Graph
-output = unlabelledConnectedSimpleGraphs
+  "Examples.Factorial": `output :: Species Vertex Graph
+output = clique 1 + (productWith joinTwo (clique 1) output)
 `,
 };
 const generatedFramesFile = "frames.jsonl";
-let currentModule = "Examples.Equivalence";
+let currentModule = "Examples.Sandbox";
 let frames = [];
 let vertexCount = 0;
 let current = 0;
@@ -590,18 +521,6 @@ let colorCliqueEdges = false;
 let shadeCliqueAreas = false;
 let layoutMode = "circle";
 
-function formatBytes(bytes) {
-  if (!Number.isFinite(bytes) || bytes <= 0) return "Unknown";
-  const units = ["B", "KB", "MB", "GB"];
-  let value = bytes;
-  let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024;
-    unit += 1;
-  }
-  return `${value.toFixed(value >= 10 || unit === 0 ? 0 : 1)} ${units[unit]}`;
-}
-
 function setOverlay(message) {
   overlay.textContent = message;
   overlay.classList.toggle("hidden", message === "");
@@ -610,6 +529,18 @@ function setOverlay(message) {
 function setCompileOutput(message, failed = false) {
   compileOutput.textContent = message;
   compileOutput.classList.toggle("bad", failed);
+}
+
+function populatePaletteSelect() {
+  paletteSelect.innerHTML = "";
+  cliquePalettes.forEach((palette, index) => {
+    const option = document.createElement("option");
+    option.value = String(index);
+    option.textContent = palette.name;
+    paletteSelect.appendChild(option);
+  });
+  paletteSelect.value = "0";
+  cliquePalette = cliquePalettes[0].colors;
 }
 
 function populateProgramPresets() {
@@ -700,9 +631,20 @@ function renderNoteText(noteText) {
       return;
     }
 
+    if (block.type === "list") {
+      const list = document.createElement("ul");
+      block.items.forEach((item) => {
+        const listItem = document.createElement("li");
+        appendInlineMarkdown(listItem, item);
+        list.appendChild(listItem);
+      });
+      proseBody.appendChild(list);
+      return;
+    }
+
     const paragraph = document.createElement("p");
     if (block.type === "heading") paragraph.className = "note-heading";
-    appendInlineCode(paragraph, block.text);
+    appendInlineMarkdown(paragraph, block.text);
     proseBody.appendChild(paragraph);
   });
 
@@ -715,6 +657,7 @@ function parseNoteBlocks(noteText) {
   const blocks = [];
   const lines = noteText.replace(/\r\n/g, "\n").split("\n");
   let paragraph = [];
+  let listItems = [];
   let codeLines = [];
   let inCode = false;
 
@@ -726,6 +669,12 @@ function parseNoteBlocks(noteText) {
     paragraph = [];
   }
 
+  function flushList() {
+    if (!listItems.length) return;
+    blocks.push({ type: "list", items: listItems });
+    listItems = [];
+  }
+
   lines.forEach((line) => {
     if (line.trim().startsWith("```")) {
       if (inCode) {
@@ -734,6 +683,7 @@ function parseNoteBlocks(noteText) {
         inCode = false;
       } else {
         flushParagraph();
+        flushList();
         inCode = true;
       }
       return;
@@ -744,16 +694,26 @@ function parseNoteBlocks(noteText) {
       return;
     }
 
-    if (!line.trim()) flushParagraph();
-    else paragraph.push(line);
+    const trimmed = line.trim();
+    if (!trimmed) {
+      flushParagraph();
+      flushList();
+    } else if (trimmed.startsWith("- ")) {
+      flushParagraph();
+      listItems.push(trimmed.slice(2).trim());
+    } else {
+      flushList();
+      paragraph.push(line);
+    }
   });
 
   if (inCode) blocks.push({ type: "code", text: codeLines.join("\n") });
   flushParagraph();
+  flushList();
   return blocks;
 }
 
-function appendInlineCode(parent, text) {
+function appendInlineMarkdown(parent, text) {
   text.split(/(`[^`]+`)/g).forEach((part) => {
     if (!part) return;
     if (part.startsWith("`") && part.endsWith("`")) {
@@ -761,9 +721,66 @@ function appendInlineCode(parent, text) {
       code.textContent = part.slice(1, -1);
       parent.appendChild(code);
     } else {
-      parent.appendChild(document.createTextNode(part));
+      appendEmphasisText(parent, part);
     }
   });
+}
+
+function appendEmphasisText(parent, text) {
+  let index = 0;
+  while (index < text.length) {
+    const next = nextEmphasisDelimiter(text, index);
+    if (!next) {
+      parent.appendChild(document.createTextNode(text.slice(index)));
+      return;
+    }
+
+    if (next.start > index) {
+      parent.appendChild(document.createTextNode(text.slice(index, next.start)));
+    }
+
+    const emphasis = document.createElement("em");
+    emphasis.textContent = text.slice(next.start + 1, next.end);
+    parent.appendChild(emphasis);
+    index = next.end + 1;
+  }
+}
+
+function nextEmphasisDelimiter(text, fromIndex) {
+  for (let index = fromIndex; index < text.length; index += 1) {
+    const delimiter = text[index];
+    if (delimiter !== "*" && delimiter !== "_") continue;
+    if (!canOpenEmphasis(text, index, delimiter)) continue;
+
+    const end = findClosingEmphasis(text, index + 1, delimiter);
+    if (end !== -1) return { start: index, end };
+  }
+  return null;
+}
+
+function findClosingEmphasis(text, fromIndex, delimiter) {
+  for (let index = fromIndex; index < text.length; index += 1) {
+    if (text[index] === delimiter && canCloseEmphasis(text, index, delimiter)) {
+      return index;
+    }
+  }
+  return -1;
+}
+
+function canOpenEmphasis(text, index, delimiter) {
+  if (text[index + 1] === delimiter || /\s/.test(text[index + 1] || "")) return false;
+  if (delimiter === "_") return !isWordCharacter(text[index - 1] || "");
+  return true;
+}
+
+function canCloseEmphasis(text, index, delimiter) {
+  if (text[index - 1] === delimiter || /\s/.test(text[index - 1] || "")) return false;
+  if (delimiter === "_") return !isWordCharacter(text[index + 1] || "");
+  return true;
+}
+
+function isWordCharacter(character) {
+  return /[A-Za-z0-9]/.test(character);
 }
 
 function parseJsonLines(text) {
@@ -1086,9 +1103,13 @@ function cliqueGroups(cliqueModel) {
 
 function drawCliqueAreas(cliqueModel) {
   cliqueGroups(cliqueModel).forEach(([group, indices]) => {
-    const points = indices.map((index) => positions[index]).filter(Boolean);
+    const lineEntries = indices
+      .map((index) => ({ index, point: positions[index] }))
+      .filter((entry) => Boolean(entry.point));
+    const points = lineEntries.map((entry) => entry.point);
     if (!points.length) return;
     const color = cliqueModel.colors[indices[0]] || cliquePalette[group % cliquePalette.length];
+    const areaRadius = showVertices ? 38 : 24;
 
     ctx.save();
     ctx.globalAlpha = 0.22;
@@ -1096,9 +1117,16 @@ function drawCliqueAreas(cliqueModel) {
     ctx.strokeStyle = color;
     ctx.lineWidth = 2;
 
+    if (layoutMode === "line") {
+      const lineArcOffset = showVertices ? 23 : 0;
+      drawLineCliqueArea(lineEntries, lineArcOffset, areaRadius);
+      ctx.restore();
+      return;
+    }
+
     if (points.length === 1) {
       ctx.beginPath();
-      ctx.arc(points[0].x, points[0].y, showVertices ? 38 : 24, 0, Math.PI * 2);
+      ctx.arc(points[0].x, points[0].y, areaRadius, 0, Math.PI * 2);
       ctx.fill();
       ctx.globalAlpha = 0.45;
       ctx.stroke();
@@ -1107,7 +1135,7 @@ function drawCliqueAreas(cliqueModel) {
     }
 
     if (points.length === 2) {
-      drawCapsule(points[0], points[1], showVertices ? 38 : 24);
+      drawCapsule(points[0], points[1], areaRadius);
       ctx.fill();
       ctx.globalAlpha = 0.45;
       ctx.stroke();
@@ -1127,6 +1155,101 @@ function drawCliqueAreas(cliqueModel) {
     ctx.stroke();
     ctx.restore();
   });
+}
+
+function drawLineCliqueArea(entries, arcOffset, singletonRadius) {
+  const sorted = entries.slice().sort((a, b) => a.point.x - b.point.x);
+  const points = sorted.map((entry) => entry.point);
+  const y = points.reduce((sum, point) => sum + point.y, 0) / points.length;
+
+  if (sorted.length === 1) {
+    ctx.beginPath();
+    ctx.arc(points[0].x, y, singletonRadius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 0.45;
+    ctx.stroke();
+    return;
+  }
+
+  if (sorted.length > 2) {
+    drawLineCliqueRegion(points, y, arcOffset, "top");
+    ctx.fill();
+    drawLineCliqueRegion(points, y, arcOffset, "bottom");
+    ctx.fill();
+  }
+
+  for (let index = 0; index < sorted.length - 1; index += 1) {
+    if (!shouldShadeLineCliqueLens(sorted[index], sorted[index + 1], sorted.length)) continue;
+    drawLineCliqueLens(points[index], points[index + 1], y, arcOffset);
+    ctx.fill();
+  }
+
+  ctx.globalAlpha = 0.45;
+  ctx.lineWidth = 2;
+
+  if (sorted.length > 2) {
+    drawLineCliqueRegion(points, y, arcOffset, "top");
+    ctx.stroke();
+    drawLineCliqueRegion(points, y, arcOffset, "bottom");
+    ctx.stroke();
+  }
+
+  for (let index = 0; index < sorted.length - 1; index += 1) {
+    if (!shouldShadeLineCliqueLens(sorted[index], sorted[index + 1], sorted.length)) continue;
+    drawLineCliqueLens(points[index], points[index + 1], y, arcOffset);
+    ctx.stroke();
+  }
+}
+
+function shouldShadeLineCliqueLens(left, right, cliqueSize) {
+  if (cliqueSize === 2) return true;
+
+  // Consecutive clique vertices can skip over vertices from other cliques; those
+  // leaf lenses have width > 2 in the full line order and should stay unfilled.
+  return Math.abs(right.index - left.index) <= 1;
+}
+
+function drawLineCliqueRegion(points, y, radius, side) {
+  const first = points[0];
+  const last = points[points.length - 1];
+  ctx.beginPath();
+
+  if (side === "top") {
+    ctx.moveTo(first.x, y - radius);
+    drawLineCliqueArcBetween(first, last, y, radius, "top", false);
+    for (let index = points.length - 2; index >= 0; index -= 1) {
+      drawLineCliqueArcBetween(points[index], points[index + 1], y, radius, "top", true);
+    }
+  } else {
+    ctx.moveTo(last.x, y + radius);
+    drawLineCliqueArcBetween(first, last, y, radius, "bottom", true);
+    for (let index = 0; index < points.length - 1; index += 1) {
+      drawLineCliqueArcBetween(points[index], points[index + 1], y, radius, "bottom", false);
+    }
+  }
+
+  ctx.closePath();
+}
+
+function drawLineCliqueLens(left, right, y, offset) {
+  ctx.beginPath();
+  ctx.moveTo(left.x, y - offset);
+  drawLineCliqueArcBetween(left, right, y, offset, "top", false);
+  ctx.lineTo(right.x, y + offset);
+  drawLineCliqueArcBetween(left, right, y, offset, "bottom", true);
+  ctx.closePath();
+}
+
+function drawLineCliqueArcBetween(left, right, y, offset, side, reverse) {
+  const cx = (left.x + right.x) / 2;
+  const cy = y + (side === "top" ? -offset : offset);
+  const arcRadius = Math.max(1, Math.abs(right.x - left.x) / 2);
+
+  if (side === "top") {
+    ctx.arc(cx, cy, arcRadius, reverse ? 0 : Math.PI, reverse ? Math.PI : 0, reverse);
+  } else {
+    ctx.arc(cx, cy, arcRadius, reverse ? 0 : Math.PI, reverse ? Math.PI : 0, !reverse);
+  }
 }
 
 function drawCapsule(a, b, radius) {
@@ -1172,7 +1295,6 @@ function drawFrame() {
     ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
     title.textContent = "No frames loaded";
     count.textContent = "0 / 0";
-    vertexTotal.textContent = "0";
     playButton.disabled = true;
     return;
   }
@@ -1190,7 +1312,6 @@ function drawFrame() {
     previousEdgeKeys = new Set();
     title.textContent = `Frame ${current + 1}`;
     count.textContent = `${current + 1} / ${frames.length.toLocaleString()}`;
-    vertexTotal.textContent = String(points.length);
     playButton.disabled = frames.length <= 1;
     jumpInput.max = String(frames.length);
     return;
@@ -1289,7 +1410,6 @@ function drawFrame() {
   previousEdgeKeys = nextEdgeKeys;
   title.textContent = `Frame ${current + 1}`;
   count.textContent = `${current + 1} / ${frames.length.toLocaleString()}`;
-  vertexTotal.textContent = String(vertexCount);
   playButton.disabled = frames.length <= 1;
   jumpInput.max = String(frames.length);
 }
@@ -1378,16 +1498,15 @@ async function loadFrames() {
     const response = await fetch(`${generatedFramesFile}?t=${Date.now()}`);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const text = await response.text();
-    const responseBytes = Number(response.headers.get("content-length")) || text.length;
     loadStatus.textContent = "Parsing";
     await new Promise((resolve) => window.setTimeout(resolve, 0));
-    applyFramesText(text, responseBytes);
+    applyFramesText(text);
   } catch (error) {
     showFrameLoadFailure(`Could not load generated frames: ${String(error.message || error)}`);
   }
 }
 
-function applyFramesText(text, byteLength = null) {
+function applyFramesText(text) {
   frames = parseJsonLines(text);
   vertexCount = 0;
   currentVertices = [];
@@ -1395,9 +1514,6 @@ function applyFramesText(text, byteLength = null) {
   current = 0;
   previousEdgeKeys = new Set();
   lastSizeKey = "";
-  frameTotal.textContent = frames.length.toLocaleString();
-  vertexTotal.textContent = String(vertexCount);
-  dataSize.textContent = formatBytes(byteLength === null ? text.length : byteLength);
   loadStatus.textContent = "Loaded";
   setOverlay("");
   drawFrame();
@@ -1408,8 +1524,6 @@ function showFrameLoadFailure(message) {
   vertexCount = 0;
   currentVertices = [];
   positionByVertex = new Map();
-  frameTotal.textContent = "0";
-  vertexTotal.textContent = "0";
   loadStatus.textContent = "Failed";
   setOverlay(message);
   drawFrame();
@@ -1470,7 +1584,7 @@ async function compileHaskell() {
 
     setCompileOutput(payload.output || "Compiled and ran successfully.");
     if (typeof payload.framesText === "string") {
-      applyFramesText(payload.framesText, payload.framesText.length);
+      applyFramesText(payload.framesText);
     } else {
       await loadFrames();
     }
@@ -1489,22 +1603,12 @@ async function compileHaskell() {
 }
 
 compileButton.addEventListener("click", compileHaskell);
-loadMainButton.addEventListener("click", () => {
-  currentModule = "Main";
-  setCompileOutput("Loading app/Main.hs...");
-  fetch(`Main.hs?t=${Date.now()}`)
-    .then((response) => {
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      return response.text();
-    })
-    .then((source) => {
-      haskellInput.value = source;
-      presetNote.textContent = "Raw app/Main.hs.";
-      setCompileOutput("Loaded app/Main.hs.");
-    })
-    .catch((error) => setCompileOutput(`Could not load Main.hs: ${String(error.message || error)}`, true));
-});
 presetSelect.addEventListener("change", loadPresetSource);
+paletteSelect.addEventListener("change", () => {
+  const nextPalette = cliquePalettes[Number(paletteSelect.value)] || cliquePalettes[0];
+  cliquePalette = nextPalette.colors;
+  drawFrame();
+});
 toggleVertices.addEventListener("click", () => {
   showVertices = !showVertices;
   toggleVertices.textContent = showVertices ? "Hide vertices" : "Show vertices";
@@ -1512,18 +1616,11 @@ toggleVertices.addEventListener("click", () => {
   drawFrame();
 });
 toggleCliques.addEventListener("click", () => {
-  colorCliques = !colorCliques;
-  toggleCliques.textContent = colorCliques ? "Plain vertices" : "Color cliques";
-  drawFrame();
-});
-toggleCliqueEdges.addEventListener("click", () => {
-  colorCliqueEdges = !colorCliqueEdges;
-  toggleCliqueEdges.textContent = colorCliqueEdges ? "Plain edges" : "Color clique edges";
-  drawFrame();
-});
-toggleCliqueAreas.addEventListener("click", () => {
-  shadeCliqueAreas = !shadeCliqueAreas;
-  toggleCliqueAreas.textContent = shadeCliqueAreas ? "Plain areas" : "Shade cliques";
+  const enabled = !(colorCliques || colorCliqueEdges || shadeCliqueAreas);
+  colorCliques = enabled;
+  colorCliqueEdges = enabled;
+  shadeCliqueAreas = enabled;
+  toggleCliques.textContent = enabled ? "Plain cliques" : "Color cliques";
   drawFrame();
 });
 toggleLayout.addEventListener("click", () => {
@@ -1551,6 +1648,7 @@ window.addEventListener("resize", () => { lastSizeKey = ""; drawFrame(); });
 
 playButton.disabled = true;
 speedText.textContent = `${framesPerSecond()} FPS`;
+populatePaletteSelect();
 populateProgramPresets();
 loadPresetSource();
 loadFrames();

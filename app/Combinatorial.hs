@@ -187,27 +187,27 @@ undirectedPairs = pairs . sort
     pairs [] = []
     pairs (vertex:after) = [(vertex, other) | other <- after] ++ pairs after
 
-unionGraphList :: [Graph] -> Graph
-unionGraphList graphs = directedGraph vertices edges
+unionAll :: [Graph] -> Graph
+unionAll graphs = directedGraph vertices edges
   where
     vertices = concatMap graphVertices graphs
     edges = concatMap graphEdges graphs
 
 unionGraphs :: Species Graph Graph
-unionGraphs = Species $ \graphs -> [unionGraphList graphs]
+unionGraphs = Species $ \graphs -> [unionAll graphs]
 
-unionTwoGraphs :: Graph -> Graph -> Graph
-unionTwoGraphs left right = unionGraphList [left, right]
+unionTwo :: Graph -> Graph -> Graph
+unionTwo left right = unionAll [left, right]
 
 instance Semigroup Graph where
-  (<>) = unionTwoGraphs
+  (<>) = unionTwo
 
 instance Monoid Graph where
   mempty = directedGraph [] []
 
 instance Num Graph where
-  (+) = unionTwoGraphs
-  (*) = joinTwoGraphs
+  (+) = unionTwo
+  (*) = joinTwo
   negate _ = mempty
   abs = id
   signum _ = mempty
@@ -242,8 +242,8 @@ completeEdgesOn vertices =
   , a /= b
   ]
 
-joinTwoGraphs :: Graph -> Graph -> Graph
-joinTwoGraphs left right =
+fullJoinTwo :: Graph -> Graph -> Graph
+fullJoinTwo left right =
   directedGraph vertices edges
   where
     vertices = graphVertices left ++ graphVertices right
@@ -255,8 +255,8 @@ joinTwoGraphs left right =
       , b <- graphVertices right
       ]
 
-hasseJoinTwoGraphs :: Graph -> Graph -> Graph
-hasseJoinTwoGraphs left right =
+joinTwo :: Graph -> Graph -> Graph
+joinTwo left right =
   directedGraph vertices edges
   where
     vertices = graphVertices left ++ graphVertices right
@@ -268,8 +268,8 @@ hasseJoinTwoGraphs left right =
       , b <- minimalVertices right
       ]
 
-hasseJoinOpTwoGraphs :: Graph -> Graph -> Graph
-hasseJoinOpTwoGraphs left right =
+joinOpTwo :: Graph -> Graph -> Graph
+joinOpTwo left right =
   directedGraph vertices edges
   where
     vertices = graphVertices left ++ graphVertices right
@@ -277,51 +277,80 @@ hasseJoinOpTwoGraphs left right =
       graphEdges left ++
       graphEdges right ++
       [ (b, a)
-      | a <- maximalVertices left
-      , b <- minimalVertices right
+      | b <- maximalVertices right
+      , a <- minimalVertices left
       ]
 
 minimalVertices :: Graph -> [Vertex]
 minimalVertices graph =
   [ vertex
   | vertex <- graphVertices graph
-  , not (hasIncomingEdge vertex)
+  , not (hasExternalIncomingEdge vertex)
   ]
   where
-    hasIncomingEdge vertex =
-      any (\(source, target) -> source /= vertex && target == vertex) (graphEdges graph)
+    hasExternalIncomingEdge vertex =
+      any
+        (\(source, target) ->
+          source /= vertex &&
+            target == vertex &&
+            not (sameMutualComponent graph source vertex))
+        (graphEdges graph)
 
 maximalVertices :: Graph -> [Vertex]
 maximalVertices graph =
   [ vertex
   | vertex <- graphVertices graph
-  , not (hasOutgoingEdge vertex)
+  , not (hasExternalOutgoingEdge vertex)
   ]
   where
-    hasOutgoingEdge vertex =
-      any (\(source, target) -> source == vertex && target /= vertex) (graphEdges graph)
+    hasExternalOutgoingEdge vertex =
+      any
+        (\(source, target) ->
+          source == vertex &&
+            target /= vertex &&
+            not (sameMutualComponent graph vertex target))
+        (graphEdges graph)
 
-joinGraphList :: [Graph] -> Graph
-joinGraphList [] = directedGraph [] []
-joinGraphList (graph:graphs) = foldr joinTwoGraphs graph graphs
+sameMutualComponent :: Graph -> Vertex -> Vertex -> Bool
+sameMutualComponent graph left right =
+  reachableVertex graph left right && reachableVertex graph right left
+
+reachableVertex :: Graph -> Vertex -> Vertex -> Bool
+reachableVertex graph start finish = go [] [start]
+  where
+    go _ [] = False
+    go seen (vertex:rest)
+      | vertex == finish = True
+      | vertex `elem` seen = go seen rest
+      | otherwise = go (vertex:seen) (outNeighbors vertex ++ rest)
+
+    outNeighbors vertex =
+      [ target
+      | (source, target) <- graphEdges graph
+      , source == vertex
+      ]
+
+fullJoinAll :: [Graph] -> Graph
+fullJoinAll [] = directedGraph [] []
+fullJoinAll (graph:graphs) = foldr fullJoinTwo graph graphs
+
+fullJoinGraphs :: Species Graph Graph
+fullJoinGraphs = Species $ \graphs -> [fullJoinAll graphs]
+
+joinAll :: [Graph] -> Graph
+joinAll [] = directedGraph [] []
+joinAll (graph:graphs) = foldr joinTwo graph graphs
 
 joinGraphs :: Species Graph Graph
-joinGraphs = Species $ \graphs -> [joinGraphList graphs]
-
-hasseJoinGraphList :: [Graph] -> Graph
-hasseJoinGraphList [] = directedGraph [] []
-hasseJoinGraphList (graph:graphs) = foldr hasseJoinTwoGraphs graph graphs
-
-hasseJoinGraphs :: Species Graph Graph
-hasseJoinGraphs = Species $ \graphs -> [hasseJoinGraphList graphs]
+joinGraphs = Species $ \graphs -> [joinAll graphs]
 
 infixl 6 <+>
 (<+>) :: Graph -> Graph -> Graph
-(<+>) = joinTwoGraphs
+(<+>) = fullJoinTwo
 
 infixl 6 <++>
 (<++>) :: Graph -> Graph -> Graph
-(<++>) = hasseJoinTwoGraphs
+(<++>) = joinTwo
 
 idSpecies :: Species a a
 idSpecies = Species id
@@ -535,10 +564,26 @@ left *|*> join = convolveWith join left
 
 infixl 7 *|*
 (*|*) :: Species a Graph -> Species a Graph -> Species a Graph
-(*|*) = convolveWith unionTwoGraphs
+(*|*) = convolveWith unionTwo
+
+infixl 7 >->
+(>->) :: Species a Graph -> Species a Graph -> Species a Graph
+(>->) = convolveWith joinTwo
+
+infixl 7 <-<
+(<-<) :: Species a Graph -> Species a Graph -> Species a Graph
+(<-<) = convolveWith joinOpTwo
+
+-- infixl 7 >=>
+-- (>=>) :: Species a Graph -> Species a Graph -> Species a Graph
+-- (>=>) = convolveWith fullJoinTwo
+
+-- infixl 7 <=<
+-- (<=<) :: Species a Graph -> Species a Graph -> Species a Graph
+-- (<=<) = convolveWith joinOpTwo
 
 orderedGraphProduct :: Species a Graph -> Species a Graph -> Species a Graph
-orderedGraphProduct = convolveWith joinTwoGraphs
+orderedGraphProduct = convolveWith fullJoinTwo
 
 singletonGraph :: Species Vertex Graph
 singletonGraph =
