@@ -208,11 +208,7 @@
   #stage {
     position: relative;
     min-height: 360px;
-    background:
-      linear-gradient(rgba(216, 224, 231, 0.45) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(216, 224, 231, 0.45) 1px, transparent 1px),
-      #fbfdff;
-    background-size: 28px 28px;
+    background: #fbfdff;
   }
 
   canvas { width: 100%; height: 100%; min-height: 360px; display: block; }
@@ -849,6 +845,40 @@ function circlePositions(width, height, count) {
   });
 }
 
+function drawPolarGrid(width, height) {
+  const cx = width / 2;
+  const cy = height / 2;
+  const maxRadius = Math.hypot(Math.max(cx, width - cx), Math.max(cy, height - cy));
+  const ringStep = 56;
+  const spokeCount = 24;
+
+  ctx.save();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = "rgba(216, 224, 231, 0.58)";
+
+  for (let radius = ringStep; radius < maxRadius; radius += ringStep) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  ctx.strokeStyle = "rgba(216, 224, 231, 0.42)";
+  for (let index = 0; index < spokeCount; index += 1) {
+    const angle = -Math.PI / 2 + index * Math.PI * 2 / spokeCount;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(angle) * maxRadius, cy + Math.sin(angle) * maxRadius);
+    ctx.stroke();
+  }
+
+  ctx.strokeStyle = "rgba(38, 84, 124, 0.14)";
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.arc(cx, cy, Math.max(90, Math.min(width, height) * 0.36), 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function linePositions(width, height, count) {
   if (count <= 0) return [];
   if (count === 1) return [{ x: width / 2, y: height / 2 }];
@@ -1292,7 +1322,10 @@ function drawFrame() {
   if (!frames.length) {
     vertexCount = 0;
     resizeCanvas();
-    ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+    ctx.clearRect(0, 0, width, height);
+    drawPolarGrid(width, height);
     title.textContent = "No frames loaded";
     count.textContent = "0 / 0";
     playButton.disabled = true;
@@ -1328,6 +1361,7 @@ function drawFrame() {
   const width = canvas.clientWidth;
   const height = canvas.clientHeight;
   ctx.clearRect(0, 0, width, height);
+  drawPolarGrid(width, height);
 
   const edges = frameEdges(frame);
   const nextEdgeKeys = new Set(edges.map(edgeKey));
